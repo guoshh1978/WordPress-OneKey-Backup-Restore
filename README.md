@@ -80,7 +80,6 @@ wp-backup-restore/
 ├── wp-backup-restore.php # 主插件文件
 └── README.md # 说明文档
 
-```text
 备份文件存储于：
 wp-content/uploads/wpbkres/
 ├── backup_*.bgbk # 备份文件
