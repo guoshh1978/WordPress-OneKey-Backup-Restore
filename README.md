@@ -84,7 +84,7 @@ wp-backup-restore/
 wp-content/uploads/wpbkres/
 ├── backup_*.bgbk # 备份文件
 └── restore.log # 还原日志
-
+```
 
 ---
 ## 🤝 贡献与反馈
