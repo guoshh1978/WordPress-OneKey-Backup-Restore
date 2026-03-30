@@ -74,6 +74,8 @@ backup.bgbk
 ```text
 wp-backup-restore/
 ├── wp-backup-restore.php # 主入口
+├── restore-api.php # API接口
+├── restore-worker.php # 工作调度
 ├── includes/ # 核心逻辑
 ├── assets/ # 前端资源
 └── README.md
