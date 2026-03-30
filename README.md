@@ -1,13 +1,13 @@
-# WP 一键备份还原（高性能版） ⚡
+# WP 一键备份还原 ⚡
 
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue)](https://www.php.net/)
 [![WordPress](https://img.shields.io/badge/WordPress-5.0%2B-brightgreen)](https://wordpress.org/)
 [![License](https://img.shields.io/badge/License-GPL%20v2-orange)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
 
-一个面向实际生产环境、大数据量站点的 WordPress 备份与还原工具。  
+一个 WordPress 备份与还原工具。  
 **核心目标：速度优先、稳定优先、可控优先。**
 
-> ⚠️ **注意：** 本项目为高性能优化版，直接调用系统级命令，不追求在受限虚拟主机上的极端兼容性。
+> ⚠️ **注意：** 本项目为性能优化版，直接调用系统级命令，不追求在受限虚拟主机上的极端兼容性。
 
 ---
 
@@ -141,10 +141,10 @@ wp-backup-restore/
 
 ## 🧱 项目定位
 
-> ✅ **高性能自用/运维工具**  
+> ✅ **自用/运维工具**  
 > ❌ **通用商业兼容插件**
 
-本项目优先服务于**大站点、高频迁移**场景，减少运维负担。
+本项目服务于**站点迁移**场景，减少运维负担。
 
 ---
 
