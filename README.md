@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/License-GPL%20v2-orange)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
 
 这是一个专为**大数据量站点**设计的 WordPress 备份与还原工具。它直接调用系统级能力，支持动态分片上传与原子级数据库切换，追求极致的执行速度与还原成功率。
+<img width="1352" height="908" alt="image" src="https://github.com/user-attachments/assets/ba0be247-4f55-490c-9569-8c3e7c6668d2" />
 
 ---
 
@@ -47,11 +48,15 @@
 2. 系统将弹出“磁盘空间检查”窗口，自动计算站点文件和数据库总大小。
 3. 点击 **「继续」**，系统将在后台执行：扫描文件 -> 打包压缩 -> 流式导出数据库 -> 生成 `.bgbk` 备份包。
 4. 完成后，备份包会显示在下拉列表中。
+<img width="2184" height="832" alt="image" src="https://github.com/user-attachments/assets/642a925e-deb5-4dc8-bd1e-3e8d1edcecf4" />
+
 
 ### 🔹 上传外部备份
 1. 点击 **「上传备份」**，选择本地的 `.bgbk` 文件。
 2. 插件会自动开启**动态分片上传**。如果由于网络波动中断，只需再次点击上传并选择同一文件，系统会自动实现**断点续传**。
 3. 上传完成后，文件将出现在还原下拉列表中。
+<img width="1288" height="948" alt="image" src="https://github.com/user-attachments/assets/e5f5e394-17e3-4619-befb-bea738d49b21" />
+
 
 ### 🔹 还原全站 (迁移)
 1. 从下拉列表中选择目标备份文件。
