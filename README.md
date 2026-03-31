@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/License-GPL%20v2-orange)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
 
 这是一个专为**大数据量站点**设计的 WordPress 备份与还原工具。它直接调用系统级能力，支持动态分片上传与原子级数据库切换，追求极致的执行速度与还原成功率。
+
 <img width="600" height="400" alt="image" src="https://github.com/user-attachments/assets/ba0be247-4f55-490c-9569-8c3e7c6668d2" />
 
 ---
