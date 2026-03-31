@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: WP一键备份还原
- * Description: 批量处理、兼容序列化的安全域名替换、Session保持、严格目录排除。提供现代UI、备份文件管理、分片上传（动态分片、断点续传、指数退避重试）。
- * Version: 1.0.1
+ * Description: 批量处理、兼容序列化的安全域名替换、Session保持、严格目录排除。提供现代UI、备份文件管理、分片上传（动态分片、断点续传、指数退避重试），包含磁盘空间预检查与ZIP64风险提示。
+ * Version: 1.0.3
  * Author: Stone
  */
 
@@ -43,6 +43,8 @@ class WP_Backup_Restore_Active {
         add_action( 'wp_ajax_wp_backup_upload_chunk', array( $this, 'ajax_upload_chunk' ) );
         add_action( 'wp_ajax_wp_backup_upload_status', array( $this, 'ajax_upload_status' ) );
         add_action( 'wp_ajax_wp_backup_upload_cancel', array( $this, 'ajax_upload_cancel' ) );
+        
+        add_action( 'wp_ajax_wp_backup_check_space', array( $this, 'ajax_check_space' ) );
     }
     
     private function get_backup_dir() {
@@ -143,6 +145,104 @@ class WP_Backup_Restore_Active {
         $this->log_message( "已清理旧任务残留文件", 'INFO' );
     }
     
+    // ==================== 空间与ZIP64检查 ====================
+    
+    private function estimate_site_size() {
+        $total = 0;
+        $root = ABSPATH;
+        $exclude = $this->get_backup_dir();
+        $iter = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, RecursiveDirectoryIterator::SKIP_DOTS ) );
+        foreach ( $iter as $f ) {
+            $p = str_replace( '\\', '/', $f->getRealPath() );
+            if ( strpos( $p, $exclude ) === 0 ) continue;
+            if ( $f->isFile() ) {
+                $total += $f->getSize();
+            }
+        }
+        global $wpdb;
+        $db_size = $wpdb->get_var( "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema = DATABASE()" );
+        if ( $db_size ) {
+            $total += $db_size;
+        }
+        return $total;
+    }
+    
+    private function estimate_restore_space( $backup_file ) {
+        $zip = new ZipArchive();
+        if ( $zip->open( $backup_file ) !== true ) {
+            return 0;
+        }
+        $uncompressed = 0;
+        for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+            $stat = $zip->statIndex( $i );
+            $uncompressed += $stat['size'];
+        }
+        $zip->close();
+        return $uncompressed * 1.2;
+    }
+    
+    private function check_zip64_compatibility( $size_in_bytes ) {
+        if ( $size_in_bytes <= 4 * 1024 * 1024 * 1024 ) {
+            return '';
+        }
+        $php_version = PHP_VERSION;
+        $libzip_version = phpversion('zip');
+        if ( version_compare( PHP_VERSION, '7.0.0', '<' ) ) {
+            return "您的 PHP 版本为 {$php_version}，对超过 4GB 的 ZIP 文件（ZIP64）支持不完善，备份/还原可能失败。建议升级到 PHP 7.0 以上。";
+        } elseif ( $libzip_version && version_compare( $libzip_version, '1.6.0', '<' ) ) {
+            return "您的 libzip 扩展版本为 {$libzip_version}，对 ZIP64 支持不完整，处理大文件可能出错。请升级 libzip 到 1.6.0 以上。";
+        }
+        return "备份文件超过 4GB，当前环境支持 ZIP64，可正常处理。";
+    }
+    
+    public function ajax_check_space() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( '无权限' );
+        }
+        if ( ! wp_verify_nonce( $_POST['_wpnonce'], 'wp_backup_action' ) ) {
+            wp_send_json_error( '无效请求' );
+        }
+        
+        $type = isset( $_POST['check_type'] ) ? sanitize_text_field( $_POST['check_type'] ) : '';
+        $backup_file = isset( $_POST['backup_file'] ) ? sanitize_text_field( $_POST['backup_file'] ) : '';
+        
+        $free = disk_free_space( ABSPATH );
+        if ( $free === false ) {
+            wp_send_json_error( '无法获取磁盘空间信息' );
+        }
+        
+        $required = 0;
+        $zip64_warning = '';
+        $message = '';
+        
+        if ( $type === 'backup' ) {
+            $total_size = $this->estimate_site_size();
+            $required = $total_size * 1.2;
+            $message = sprintf( '当前站点总大小约 %s，备份过程需要至少 %s 可用空间。', size_format( $total_size ), size_format( $required ) );
+            $zip64_warning = $this->check_zip64_compatibility( $total_size );
+        } elseif ( $type === 'restore' ) {
+            if ( empty( $backup_file ) || ! file_exists( $backup_file ) ) {
+                wp_send_json_error( '备份文件不存在' );
+            }
+            $required = $this->estimate_restore_space( $backup_file );
+            $message = sprintf( '解压后预计占用 %s，还原过程需要至少 %s 可用空间。', size_format( $required ), size_format( $required ) );
+            $zip64_warning = $this->check_zip64_compatibility( filesize( $backup_file ) );
+        } else {
+            wp_send_json_error( '无效的检查类型' );
+        }
+        
+        $enough = ( $free >= $required );
+        wp_send_json_success( array(
+            'enough'        => $enough,
+            'free'          => size_format( $free ),
+            'required'      => size_format( $required ),
+            'message'       => $message,
+            'zip64_warning' => $zip64_warning,
+        ) );
+    }
+    
+    // ==================== 备份引擎 ====================
+    
     public function do_full_backup( $task_id, $params ) {
         $this->cleanup_old_residuals( $task_id );
         $this->maybe_truncate_worker_log();
@@ -185,6 +285,8 @@ class WP_Backup_Restore_Active {
             $this->update_worker_state( $task_id, ['status' => 'error', 'message' => $e->getMessage()] );
         }
     }
+    
+    // ==================== 还原引擎 ====================
     
     public function do_full_restore( $task_id, $params ) {
         set_time_limit( 0 );
@@ -250,6 +352,8 @@ class WP_Backup_Restore_Active {
             $this->update_worker_state( $task_id, ['status' => 'error', 'message' => $e->getMessage()] );
         }
     }
+    
+    // ==================== 辅助函数 ====================
     
     private function export_db_streaming( $file, $task_id ) {
         global $wpdb;
@@ -476,6 +580,8 @@ class WP_Backup_Restore_Active {
         return glob($dir . '/*.bgbk') ?: [];
     }
     
+    // ==================== AJAX 方法 ====================
+    
     public function ajax_download_backup() {
         while (ob_get_level()) ob_end_clean();
         if ( ! current_user_can( 'manage_options' ) ) wp_die( '无权限', '', array( 'response' => 403 ) );
@@ -633,6 +739,8 @@ class WP_Backup_Restore_Active {
         wp_send_json_success( [ 'message' => '已中断并清理临时文件' ] );
     }
     
+    // ==================== UI ====================
+    
     public function enqueue_scripts($hook) {
         if ($hook !== 'tools_page_wp-backup-restore') return;
         wp_enqueue_script( 'jquery' );
@@ -758,6 +866,109 @@ class WP_Backup_Restore_Active {
             var pollInterval = null;
             var isStopping = false;
             
+            // 显示等待模态窗（用于空间检查时的 Loading）
+            function showWaitingModal() {
+                resetConfirmButton();
+                $('#modal-title').text('磁盘空间检查');
+                $('#progress-bar').hide();
+                $('#progress-msg').html('正在计算磁盘空间，请稍候...<br><span style="font-size:12px;">(若站点文件较多，可能需要几秒钟)</span>');
+                $('#stop-btn').hide();
+                $('#confirm-btn').hide();
+                $('#cancel-modal-btn').hide();
+                $('#modal-progress').show();
+            }
+            
+            // 通用模态窗确认（用于显示检查结果）
+			function showModalWithConfirm(title, message, canProceed, onConfirm, extraWarning) {
+				resetConfirmButton();
+				$('#modal-title').text(title);
+				$('#progress-bar').hide();               // 空间检查时不需要进度条
+				$('#progress-msg').html(message.replace(/\n/g, '<br>') + (extraWarning ? '<br><br><span style="color:#d63638;">⚠️ 额外风险提示：</span><br>' + extraWarning : ''));
+				$('#stop-btn').hide();
+				$('#cancel-modal-btn').show().text('取消').off('click').click(closeModal);
+				if (canProceed) {
+					$('#confirm-btn').show().text('继续').off('click').click(function() {
+						closeModal();
+						onConfirm();
+					});
+				} else {
+					$('#confirm-btn').show().text('仍然继续（风险自担）').off('click').click(function() {
+						closeModal();
+						onConfirm();
+					});
+				}
+				$('#modal-progress').show();
+			}
+            
+            // 备份按钮：先显示等待，再检查空间
+            $('#btn-bak').click(function() {
+                showWaitingModal();
+                $.post(ajaxUrl, {
+                    action: 'wp_backup_check_space',
+                    check_type: 'backup',
+                    _wpnonce: nonce
+                }, function(res) {
+                    closeModal(); // 关闭等待模态窗
+                    if (res.success) {
+                        var data = res.data;
+                        var msg = data.message + '\n可用空间：' + data.free + '\n需要空间：' + data.required;
+                        showModalWithConfirm('磁盘空间检查', msg, data.enough, function() {
+                            startTask('backup_start', {}, '全站备份进行中');
+                        }, data.zip64_warning);
+                    } else {
+                        alert('检查失败：' + (res.data || '未知错误'));
+                    }
+                }, 'json').fail(function() {
+                    closeModal();
+                    alert('请求失败，请检查网络连接');
+                });
+            });
+            
+            // 还原按钮：先显示等待，再检查空间
+            $('#btn-res').click(function() {
+                var file = $('#sel-bak').val();
+                if (!file) {
+                    showModal('提示', true);
+                    $('#progress-msg').html('请先选择一个备份文件。');
+                    $('#confirm-btn').hide();
+                    $('#cancel-modal-btn').show();
+                    return;
+                }
+                showWaitingModal();
+                $.post(ajaxUrl, {
+                    action: 'wp_backup_check_space',
+                    check_type: 'restore',
+                    backup_file: file,
+                    _wpnonce: nonce
+                }, function(res) {
+                    closeModal();
+                    if (res.success) {
+                        var data = res.data;
+                        var msg = data.message + '\n可用空间：' + data.free + '\n需要空间：' + data.required;
+                        showModalWithConfirm('磁盘空间检查', msg, data.enough, function() {
+                            // 继续原有还原确认流程
+                            showModal('确认还原', true);
+                            $('#progress-msg').html('⚠️ 此操作将覆盖现有数据，不可逆！确认要继续吗？');
+                            $('#confirm-btn').one('click', function() {
+                                closeModal();
+                                startTask('restore_start', { 
+                                    backup_file: file,
+                                    browser_cookie: document.cookie,
+                                    current_url: window.location.origin
+                                }, '全站还原进行中');
+                            });
+                            $('#cancel-modal-btn').one('click', closeModal);
+                        }, data.zip64_warning);
+                    } else {
+                        alert('检查失败：' + (res.data || '未知错误'));
+                    }
+                }, 'json').fail(function() {
+                    closeModal();
+                    alert('请求失败，请检查网络连接');
+                });
+            });
+            
+            // ========== 以下为下载、删除、上传、备份还原轮询等 ==========
             $('#btn-download').click(function(e) {
                 e.preventDefault();
                 var file = $('#sel-bak').val();
@@ -775,6 +986,7 @@ class WP_Backup_Restore_Active {
                 }, 'json').fail(function() { alert('请求失败，请检查网络连接'); });
             });
             
+			// ========== 动态分片上传 ==========
             let currentFile = null;
             let currentChunkSize = 2 * 1024 * 1024;
             let minChunkSize = 512 * 1024;
@@ -995,26 +1207,27 @@ class WP_Backup_Restore_Active {
                 uploadFileInChunks(file);
             });
             
+            // ========== 备份/还原轮询逻辑（保持不变） ==========
             function resetConfirmButton() {
                 $('#confirm-btn').off('click').click(closeModal);
                 $('#cancel-modal-btn').off('click').click(closeModal);
             }
-            function showModal(title, showCancel = false) {
-                resetConfirmButton();
-                $('#modal-title').text(title);
-                $('#progress-bar').css('width', '0%').text('0%');
-                $('#progress-msg').text('准备中...');
-                $('#stop-btn').hide();
-                $('#confirm-btn').hide();
-                $('#cancel-modal-btn').hide();
-                if (showCancel) {
-                    $('#cancel-modal-btn').show().text('取消');
-                    $('#confirm-btn').show().text('确认');
-                } else {
-                    $('#stop-btn').show().prop('disabled', false);
-                }
-                $('#modal-progress').show();
-            }
+			function showModal(title, showCancel = false) {
+				resetConfirmButton();
+				$('#modal-title').text(title);
+				$('#progress-bar').css('width', '0%').text('0%').show();   // 确保进度条可见
+				$('#progress-msg').text('准备中...');
+				$('#stop-btn').hide();
+				$('#confirm-btn').hide();
+				$('#cancel-modal-btn').hide();
+				if (showCancel) {
+					$('#cancel-modal-btn').show().text('取消');
+					$('#confirm-btn').show().text('确认');
+				} else {
+					$('#stop-btn').show().prop('disabled', false);
+				}
+				$('#modal-progress').show();
+			}
             function closeModal() {
                 $('#modal-progress').hide();
                 if (pollInterval) clearInterval(pollInterval);
@@ -1103,26 +1316,7 @@ class WP_Backup_Restore_Active {
                     }
                 }, 'json');
             }
-            $('#btn-bak').click(function() { startTask('backup_start', {}, '全站备份进行中'); });
-            $('#btn-res').click(function() {
-                var file = $('#sel-bak').val();
-                if (!file) {
-                    showModal('提示', true);
-                    $('#progress-msg').html('请先选择一个备份文件。');
-                    $('#confirm-btn').hide();
-                    $('#cancel-modal-btn').show();
-                    return;
-                }
-                var allCookies = document.cookie;
-                var currentOrigin = window.location.origin;
-                showModal('确认还原', true);
-                $('#progress-msg').html('⚠️ 此操作将覆盖现有数据，不可逆！确认要继续吗？');
-                $('#confirm-btn').one('click', function() {
-                    closeModal();
-                    startTask('restore_start', { backup_file: file, browser_cookie: allCookies, current_url: currentOrigin }, '全站还原进行中');
-                });
-                $('#cancel-modal-btn').one('click', closeModal);
-            });
+            
             $('#stop-btn').click(stopTask);
             $('#confirm-btn').click(closeModal);
             $('#cancel-modal-btn').click(closeModal);
