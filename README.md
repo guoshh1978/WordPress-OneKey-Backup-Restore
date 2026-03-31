@@ -4,7 +4,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.0%2B-brightgreen)](https://wordpress.org/)
 [![License](https://img.shields.io/badge/License-GPL%20v2-orange)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
 
-一个面向实际生产环境、大数据量站点的 WordPress 备份与还原工具。  
+一个 WordPress 备份与还原工具。  
 **核心目标：速度优先、稳定优先、可控优先。**
 
 > ⚠️ **注意：** 本项目为性能优化版，直接调用系统级命令，不追求在受限虚拟主机上的极端兼容性。
