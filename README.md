@@ -51,7 +51,10 @@
 3. 点击 **「继续」**，系统将在后台执行：扫描文件 -> 打包压缩 -> 流式导出数据库 -> 生成 `.bgbk` 备份包。
 4. 完成后，备份包会显示在下拉列表中。
 <div style="text-align: left;">
-  <img src="https://github.com/user-attachments/assets/642a925e-deb5-4dc8-bd1e-3e8d1edcecf4" alt="磁盘检查" width="50%">
+  <img src="https://github.com/user-attachments/assets/01ab90d6-c6d5-4e91-85e1-dbff0eaabe71" alt="磁盘检查" width="40%">
+</div>
+<div style="text-align: left;">
+  <img src="https://github.com/user-attachments/assets/d81d961f-deac-4361-a88c-ad906bbc55d2" alt="备份全站" width="40%">
 </div>
 
 
@@ -60,7 +63,7 @@
 2. 插件会自动开启**动态分片上传**。如果由于网络波动中断，只需再次点击上传并选择同一文件，系统会自动实现**断点续传**。
 3. 上传完成后，文件将出现在还原下拉列表中。
 <div style="text-align: left;">
-  <img src="https://github.com/user-attachments/assets/e5f5e394-17e3-4619-befb-bea738d49b21" alt="上传备份" width="50%">
+  <img src="https://github.com/user-attachments/assets/e5f5e394-17e3-4619-befb-bea738d49b21" alt="上传备份" width="40%">
 </div>
 
 ### 🔹 还原全站 (迁移)
@@ -70,6 +73,9 @@
 4. **二次确认**：确认还原操作（注意：这将覆盖当前全站数据）。
 5. **执行还原**：系统会依次执行 解压覆盖 -> 临时表导入 -> 原子切换 -> 域名替换 -> Session 恢复。
 6. **刷新页面**：完成后点击确定并刷新页面。由于数据库已更换，您可能需要重新登录。
+<div style="text-align: left;">
+  <img src="https://github.com/user-attachments/assets/62d5cd56-a4aa-435c-b5e5-69ea19ca7ee6" alt="还原全站" width="40%">
+</div>
 
 ---
 
