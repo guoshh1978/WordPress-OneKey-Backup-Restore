@@ -783,12 +783,12 @@ class WP_Backup_Restore_Active {
             'ajax_url'         => admin_url( 'admin-ajax.php' ),
             'current_level'    => $this->log_level,
             'nonce'            => wp_create_nonce( 'wp_backup_action' ),
-            // UI 文本
+            // 基础UI文本
             'no_backup_selected' => __( 'Please select a backup file', 'WP-Res' ),
             'delete_confirm'     => __( 'Are you sure you want to delete this backup file? This cannot be undone!', 'WP-Res' ),
             'only_bgbk_allowed'  => __( 'Only .bgbk backup files are allowed.', 'WP-Res' ),
             'upload_cancel_confirm' => __( 'Are you sure you want to cancel the upload and clean up temporary files?', 'WP-Res' ),
-            'restore_confirm'    => __( '⚠️ This operation will overwrite existing data and is irreversible! Continue?', 'WP-Res' ),
+            'restore_confirm'    => __( 'Confirm Restore', 'WP-Res' ),
             'disk_space_check'   => __( 'Disk Space Check', 'WP-Res' ),
             'calculating_space'  => __( 'Calculating disk space, please wait...<br><span style="font-size:12px;">(May take a few seconds if the site has many files)</span>', 'WP-Res' ),
             'backup_title'       => __( 'Full Site Backup in Progress', 'WP-Res' ),
@@ -839,6 +839,21 @@ class WP_Backup_Restore_Active {
             'modal_button_continue_risk' => __( 'Continue Anyway (Risk Assumed)', 'WP-Res' ),
             'space_check_loading' => __( 'Disk Space Check', 'WP-Res' ),
             'space_check_msg'    => __( 'Calculating disk space, please wait...<br><span style="font-size:12px;">(May take a few seconds if the site has many files)</span>', 'WP-Res' ),
+            // ========== 修复 undefined 问题所需的新增键 ==========
+            'available_space'    => __( 'Available space', 'WP-Res' ),
+            'required_space'     => __( 'Required space', 'WP-Res' ),
+            'extra_risk_warning' => __( '⚠️ Additional risk notice:', 'WP-Res' ),
+            'select_backup_first'=> __( 'Please select a backup file first.', 'WP-Res' ),
+            'restore_confirm_msg'=> __( '⚠️ This operation will overwrite existing data and is irreversible! Continue?', 'WP-Res' ),
+            'preparing'          => __( 'Preparing...', 'WP-Res' ),
+            'stopping'           => __( 'Stopping...', 'WP-Res' ),
+            'modal_button_confirm_refresh' => __( 'Confirm and Refresh', 'WP-Res' ),
+            'start_failed'       => __( 'Failed to start task: ', 'WP-Res' ),
+            'upload_status_failed' => __( 'Failed to query upload status', 'WP-Res' ),
+            'upload_incomplete'  => __( 'Upload did not complete fully', 'WP-Res' ),
+            'upload_cancelling'  => __( 'Cancelling and cleaning temporary files...', 'WP-Res' ),
+            'upload_timeout'     => __( 'Upload timeout', 'WP-Res' ),
+            'processing'         => __( 'Processing...', 'WP-Res' ),
         );
         wp_localize_script( 'jquery', 'wp_backup_l10n', $l10n );
     }
@@ -957,7 +972,7 @@ class WP_Backup_Restore_Active {
                 resetConfirmButton();
                 $('#modal-title').text(title);
                 $('#progress-bar').hide();               // 空间检查时不需要进度条
-                $('#progress-msg').html(message.replace(/\n/g, '<br>') + (extraWarning ? '<br><br><span style="color:#d63638;">⚠️ ' + l10n.extra_risk_warning + '</span><br>' + extraWarning : ''));
+                $('#progress-msg').html(message + (extraWarning ? '<br><br><span style="color:#d63638;">⚠️ ' + (l10n.extra_risk_warning || 'Additional risk notice') + '</span><br>' + extraWarning : ''));
                 $('#stop-btn').hide();
                 $('#cancel-modal-btn').show().text(l10n.modal_button_cancel).off('click').click(closeModal);
                 if (canProceed) {
@@ -985,10 +1000,10 @@ class WP_Backup_Restore_Active {
                     closeModal(); // 关闭等待模态窗
                     if (res.success) {
                         var data = res.data;
-                        var msg = data.message + '\n' + l10n.available_space + '：' + data.free + '\n' + l10n.required_space + '：' + data.required;
+                        var msg = (data.message || '') + '<br>' + (l10n.available_space || 'Available space') + '：' + (data.free || '?') + '<br>' + (l10n.required_space || 'Required space') + '：' + (data.required || '?');
                         showModalWithConfirm(l10n.disk_space_check, msg, data.enough, function() {
                             startTask('backup_start', {}, l10n.backup_title);
-                        }, data.zip64_warning);
+                        }, data.zip64_warning || '');
                     } else {
                         alert(l10n.check_failed + (res.data || l10n.unknown_error));
                     }
@@ -1018,7 +1033,7 @@ class WP_Backup_Restore_Active {
                     closeModal();
                     if (res.success) {
                         var data = res.data;
-                        var msg = data.message + '\n' + l10n.available_space + '：' + data.free + '\n' + l10n.required_space + '：' + data.required;
+                        var msg = (data.message || '') + '<br>' + (l10n.available_space || 'Available space') + '：' + (data.free || '?') + '<br>' + (l10n.required_space || 'Required space') + '：' + (data.required || '?');
                         showModalWithConfirm(l10n.disk_space_check, msg, data.enough, function() {
                             // 继续原有还原确认流程
                             showModal(l10n.restore_confirm, true);
