@@ -3,7 +3,7 @@
 # This file is distributed under the same license as the WP-Res plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP-Res 1.2.0\n"
+"Project-Id-Version: WP-Res 1.2.1\n"
 "Report-Msgid-Bugs-To: \n"
 "Last-Translator: Stone <https://blog.cacca.cc>\n"
 "Language-Team: Chinese (Simplified) <zh_CN@li.org>\n"

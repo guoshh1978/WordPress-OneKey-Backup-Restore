@@ -1,6 +1,6 @@
 <?php
 /**
- * 独立 API 入口 (restore-api.php) - v1.0.0
+ * 独立 API 入口 (restore-api.php) - v1.2.1
  */
 ini_set('display_errors', 0);
 error_reporting(0);

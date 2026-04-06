@@ -1,6 +1,6 @@
 <?php
 /**
- * 后台工作进程 (restore-worker.php) - v1.0.0
+ * 后台工作进程 (restore-worker.php) - v1.2.1
  */
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
